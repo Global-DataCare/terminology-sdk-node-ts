@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.3.1 - 2026-10-15
+
+- Add an asynchronous `accessTokenProvider` for short-lived backend OIDC
+  access tokens while retaining `serviceToken` compatibility.
+- Document the separation between end-user authentication, backend identity,
+  issuer JWKS and the terminology client.
+
 ## 0.3.0 - 2026-10-15
 
 - Add a neutral `TerminologyClient` for text candidates, complete governed

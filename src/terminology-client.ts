@@ -1,4 +1,4 @@
-import { TerminologyCandidateClient } from './candidate-client.js';
+import { TerminologyCandidateClient, type TerminologyAccessTokenProvider } from './candidate-client.js';
 
 export type CodeCandidate = Readonly<{
   /** Optional provider/source provenance. It is not the canonical Coding.system URI. */
@@ -76,6 +76,7 @@ type JsonApiResponse = Readonly<{
 export class TerminologyClient {
   readonly #baseUrl: URL;
   readonly #serviceToken: string | undefined;
+  readonly #accessTokenProvider: TerminologyAccessTokenProvider | undefined;
   readonly #fetch: typeof fetch;
   readonly #cache: TerminologyCache;
   readonly #candidateTtlMs: number;
@@ -84,6 +85,7 @@ export class TerminologyClient {
   public constructor(options: Readonly<{
     baseUrl: string;
     serviceToken?: string;
+    accessTokenProvider?: TerminologyAccessTokenProvider;
     fetchImplementation?: typeof fetch;
     cache?: TerminologyCache;
     candidateTtlMs?: number;
@@ -93,6 +95,8 @@ export class TerminologyClient {
     this.#baseUrl = new URL(options.baseUrl);
     if (!['https:', 'http:'].includes(this.#baseUrl.protocol)) throw new Error('terminology_base_url_invalid');
     this.#serviceToken = options.serviceToken?.trim() || undefined;
+    if (this.#serviceToken && options.accessTokenProvider) throw new Error('terminology_auth_configuration_invalid');
+    this.#accessTokenProvider = options.accessTokenProvider;
     this.#fetch = options.fetchImplementation ?? fetch;
     this.#cache = options.cache ?? new MemoryTerminologyCache();
     this.#candidateTtlMs = positiveTtl(options.candidateTtlMs, 5 * 60_000);
@@ -117,7 +121,8 @@ export class TerminologyClient {
     return this.#cached(key, this.#candidateTtlMs, async () => {
       const client = new TerminologyCandidateClient({
         baseUrl: this.#baseUrl.href,
-        serviceToken: this.#serviceToken,
+        ...(this.#serviceToken ? { serviceToken: this.#serviceToken } : {}),
+        ...(this.#accessTokenProvider ? { accessTokenProvider: this.#accessTokenProvider } : {}),
         fetchImplementation: this.#fetch,
       });
       const searches = systems.length ? systems.map((system) => system) : [undefined];
@@ -235,17 +240,26 @@ export class TerminologyClient {
   async #get(path: string, query: URLSearchParams): Promise<JsonApiResponse> {
     const url = new URL(path, this.#baseUrl);
     url.search = query.toString();
-    const response = await this.#fetch(url, { headers: this.#headers() });
+    const response = await this.#fetch(url, { headers: await this.#headers() });
     const body = await response.json().catch(() => undefined) as JsonApiResponse | undefined;
     if (!response.ok) throw new Error(clean(body?.errors?.[0]?.detail) || `terminology_http_${response.status}`);
     return body ?? {};
   }
 
-  #headers(): Readonly<Record<string, string>> {
+  async #headers(): Promise<Readonly<Record<string, string>>> {
+    const accessToken = await this.#resolveAccessToken();
     return {
       accept: 'application/vnd.api+json',
-      ...(this.#serviceToken ? { authorization: `Bearer ${this.#serviceToken}` } : {}),
+      ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
     };
+  }
+
+  async #resolveAccessToken(): Promise<string | undefined> {
+    if (this.#serviceToken) return this.#serviceToken;
+    if (!this.#accessTokenProvider) return undefined;
+    const token = clean(await this.#accessTokenProvider());
+    if (!token) throw new Error('terminology_access_token_unavailable');
+    return token;
   }
 
   async #cached<T>(key: string, ttlMs: number, load: () => Promise<T>): Promise<T> {

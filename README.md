@@ -32,7 +32,7 @@ compatible alias for flat-claim integrations.
 
 The lower-level `TerminologyCandidateClient` remains exported for existing
 integrations. Product policy and clinical persistence remain in the caller,
-and the browser never receives either client or the service token.
+and the browser never receives either client or the backend access token.
 
 See [the Next.js BFF integration guide](docs/NEXTJS_BFF_INTEGRATION.md) for
 copyable, commented routes and the research-search guidance.
