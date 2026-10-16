@@ -1,0 +1,59 @@
+{
+  "name": "terminology-sdk-node-ts",
+  "version": "0.3.0",
+  "description": "Node.js download, verification and local cache adapters for terminology snapshots",
+  "author": "Connecting Solution & Applications Ltd. (ConnectHealth.info)",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Global-DataCare/terminology-sdk-node-ts.git"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./candidate-client": {
+      "types": "./dist/candidate-client.d.ts",
+      "default": "./dist/candidate-client.js"
+    },
+    "./terminology-client": {
+      "types": "./dist/terminology-client.d.ts",
+      "default": "./dist/terminology-client.js"
+    },
+    "./snapshot-runtime": {
+      "types": "./dist/snapshot-runtime.d.ts",
+      "default": "./dist/snapshot-runtime.js"
+    }
+  },
+  "files": [
+    "dist",
+    "docs",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "npm run clean && tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test --test-concurrency=1 tests/*.test.mjs",
+    "check": "npm run typecheck && npm test",
+    "prepack": "npm run check"
+  },
+  "dependencies": {
+    "sos-data-utils-ts": "0.5.1",
+    "terminology-data-utils-ts": "0.2.0",
+    "terminology-sdk-core-ts": "0.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
+  }
+}
