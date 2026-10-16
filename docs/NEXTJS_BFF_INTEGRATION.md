@@ -1,7 +1,7 @@
 # Next.js BFF terminology integration
 
-This guide is product-neutral. A Vet, human-health, emergency or third-party
-portal can use the same server-side client. Keep the service token in the BFF;
+This guide is product-neutral. Veterinary, human-health, emergency and other
+portals can use the same server-side client. Keep the service token in the BFF;
 never import this package from a Client Component.
 
 ## The four concepts
@@ -24,8 +24,59 @@ portal does not need to understand or repeat it.
 ## Install and configure once
 
 ```bash
-npm install terminology-sdk-node-ts
+npm install --save-exact terminology-sdk-node-ts@0.3.0
 ```
+
+### Authentication used by the current release
+
+There are two separate authentication boundaries:
+
+1. The portal authenticates the person to its own BFF. The BFF must validate
+   that session, ID token and applicable capability before serving a route.
+2. The BFF authenticates itself to the terminology service with the opaque
+   bearer credential described below. This is not the end-user ID token.
+
+The service operator provisions the BFF credential for the subscribed
+integration and environment. Deliver it through an approved secure channel,
+then store it in the deployment platform's secret manager as
+`TERMINOLOGY_SERVICE_TOKEN`. Store the service URL as
+`TERMINOLOGY_BASE_URL`. Do not put either value in source control, a
+`NEXT_PUBLIC_*` variable, browser storage, logs or an email.
+
+`TerminologyClient` adds `Authorization: Bearer <service token>` to managed
+service requests. The SDK does not mint or sign credentials. A BFF must not
+forward its service token to React or reuse a browser-supplied token as the
+managed-service credential.
+
+For a Firebase App Hosting deployment, configure both values as backend
+secrets and bind them only to the BFF runtime. For another hosting platform,
+use its equivalent server-side secret store.
+
+The integrator therefore needs these two values from the service operator:
+
+```dotenv
+TERMINOLOGY_BASE_URL=https://terminology.example
+TERMINOLOGY_SERVICE_TOKEN=<provisioned-separately>
+```
+
+Do not send the real token in a ticket or integration email. The email should
+identify the secret name and the secure delivery channel or secret-manager
+grant used to obtain it.
+
+### OIDC service credentials
+
+Accepting an OIDC issuer is not, by itself, authorization. An OIDC deployment
+must validate the signature and `iss`, `aud`, `exp` and the authorized backend
+client identity. The allowlist is a list of backend clients or service
+principals, not portal URLs. The issuer must expose usable discovery metadata
+and JWKS, or the service must receive an explicitly governed JWKS URL.
+
+If the managed service enables that mode later, a separate infrastructure or
+authentication provider obtains the service access token. The terminology SDK
+remains product-neutral and only sends the supplied token; it does not contain
+issuer-specific signing keys or token-creation utilities. Until the operator
+explicitly supplies an OIDC audience and client credential, use the opaque
+service token above.
 
 Create a server-only module. A module singleton reuses the cache across route
 calls in the same BFF process.
