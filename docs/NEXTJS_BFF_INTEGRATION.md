@@ -36,8 +36,9 @@ There are two separate authentication boundaries:
 2. The BFF authenticates itself to the terminology service with a short-lived
    backend OIDC access token. This is not the end-user ID token.
 
-The service operator supplies the exact terminology audience and allowlists the
-backend `client_id` for the subscribed integration. The identity provider owns
+By default, the canonical terminology base URL is also the token audience. The
+service operator allowlists the backend `client_id` for the subscribed
+integration. The identity provider owns
 the signing key and publishes its public key through HTTPS JWKS. The BFF keeps
 the issuer wallet or client credential in its deployment secret manager and
 obtains a fresh access token with a maximum lifetime of five minutes.
@@ -56,7 +57,6 @@ The integrator needs these non-secret values from the service operator:
 
 ```dotenv
 TERMINOLOGY_BASE_URL=https://terminology.example
-TERMINOLOGY_OIDC_AUDIENCE=https://terminology.example
 TERMINOLOGY_OIDC_CLIENT_ID=<allowlisted-backend-client-id>
 ```
 
@@ -95,10 +95,11 @@ if (!baseUrl) throw new Error('terminology_configuration_required');
 
 async function createBackendAccessToken(): Promise<string> {
   // Call the hosting platform's OIDC client or the BFF's governed server-wallet
-  // adapter here. Sign for the audience and client_id supplied by the service.
-  // Never use the current person's browser ID token.
+  // adapter here. The canonical service URL is the default audience. Only set
+  // TERMINOLOGY_OIDC_AUDIENCE when the operator explicitly assigns a distinct
+  // audience identifier. Never use the current person's browser ID token.
   return backendIdentity.getAccessToken({
-    audience: process.env.TERMINOLOGY_OIDC_AUDIENCE!,
+    audience: process.env.TERMINOLOGY_OIDC_AUDIENCE || baseUrl,
     clientId: process.env.TERMINOLOGY_OIDC_CLIENT_ID!,
     maxLifetimeSeconds: 300,
   });

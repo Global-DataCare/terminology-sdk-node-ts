@@ -16,4 +16,6 @@ test('documents the current BFF bearer contract and the separate end-user sessio
   assert.match(guide, /does not\s+mint or sign/i);
   assert.match(guide, /secret manager/i);
   assert.match(guide, /static compatibility\s+credential/i);
+  assert.doesNotMatch(guide, /^TERMINOLOGY_OIDC_AUDIENCE=/m);
+  assert.match(guide, /audience:\s*process\.env\.TERMINOLOGY_OIDC_AUDIENCE\s*\|\|\s*baseUrl/);
 });
