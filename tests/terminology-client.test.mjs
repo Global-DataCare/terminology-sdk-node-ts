@@ -134,3 +134,33 @@ test('supports a local terminology service without authentication while never se
   });
   assert.equal(authorization, null);
 });
+
+test('obtains a fresh backend access token for each uncached service request', async () => {
+  const authorizations = [];
+  let tokenCalls = 0;
+  const client = new TerminologyClient({
+    baseUrl: 'https://terminology.example',
+    accessTokenProvider: async () => `short-lived-token-${++tokenCalls}`,
+    fetchImplementation: async (_url, init) => {
+      authorizations.push(new Headers(init?.headers).get('authorization'));
+      return Response.json({ data: { attributes: {
+        system: 'http://loinc.org', code: new URL(_url).searchParams.get('code'),
+        text: 'Label', display: 'Label', textLanguage: 'en',
+      } } });
+    },
+  });
+
+  const context = {
+    system: 'http://loinc.org', param: 'Observation.code', language: 'en',
+    sector: 'health-care', jurisdiction: 'ES',
+  };
+  await client.resolveCodeLabels({ ...context, code: '8310-5' });
+  await client.resolveCodeLabels({ ...context, code: '8310-5' });
+  await client.resolveCodeLabels({ ...context, code: '8480-6' });
+
+  assert.deepEqual(authorizations, [
+    'Bearer short-lived-token-1',
+    'Bearer short-lived-token-2',
+  ]);
+  assert.equal(tokenCalls, 2);
+});

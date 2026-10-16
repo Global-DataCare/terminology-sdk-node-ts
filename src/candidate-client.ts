@@ -1,5 +1,7 @@
 import type { ClinicalTerminologyCandidate } from 'sos-data-utils-ts/clinical-terminology';
 
+export type TerminologyAccessTokenProvider = () => string | undefined | Promise<string | undefined>;
+
 export type TerminologyCandidateSearch = Readonly<{
   text: string;
   language: string;
@@ -33,17 +35,21 @@ type CandidateResource = Readonly<{
 export class TerminologyCandidateClient {
   readonly #baseUrl: URL;
   readonly #serviceToken: string | undefined;
+  readonly #accessTokenProvider: TerminologyAccessTokenProvider | undefined;
   readonly #fetch: typeof fetch;
 
   public constructor(options: Readonly<{
     baseUrl: string;
     serviceToken?: string;
+    accessTokenProvider?: TerminologyAccessTokenProvider;
     fetchImplementation?: typeof fetch;
   }>) {
     if (!URL.canParse(options.baseUrl)) throw new Error('terminology_base_url_invalid');
     this.#baseUrl = new URL(options.baseUrl);
     if (!['https:', 'http:'].includes(this.#baseUrl.protocol)) throw new Error('terminology_base_url_invalid');
     this.#serviceToken = options.serviceToken?.trim() || undefined;
+    if (this.#serviceToken && options.accessTokenProvider) throw new Error('terminology_auth_configuration_invalid');
+    this.#accessTokenProvider = options.accessTokenProvider;
     this.#fetch = options.fetchImplementation ?? fetch;
   }
 
@@ -70,10 +76,11 @@ export class TerminologyCandidateClient {
     for (const source of input.sources || []) if (source.trim()) query.append('source', source.trim());
     const url = new URL('/v1/terminology/candidates', this.#baseUrl);
     url.search = query.toString();
+    const accessToken = await this.#resolveAccessToken();
     const response = await this.#fetch(url, {
       headers: {
         accept: 'application/vnd.api+json',
-        ...(this.#serviceToken ? { authorization: `Bearer ${this.#serviceToken}` } : {}),
+        ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
       },
     });
     const body = await response.json().catch(() => undefined) as {
@@ -82,6 +89,14 @@ export class TerminologyCandidateClient {
     } | undefined;
     if (!response.ok) throw new Error(clean(body?.errors?.[0]?.detail) || `terminology_candidates_http_${response.status}`);
     return (body?.data || []).flatMap((resource) => mapResource(resource, input.language));
+  }
+
+  async #resolveAccessToken(): Promise<string | undefined> {
+    if (this.#serviceToken) return this.#serviceToken;
+    if (!this.#accessTokenProvider) return undefined;
+    const token = clean(await this.#accessTokenProvider());
+    if (!token) throw new Error('terminology_access_token_unavailable');
+    return token;
   }
 }
 

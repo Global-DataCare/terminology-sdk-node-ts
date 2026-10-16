@@ -1,8 +1,8 @@
 # Next.js BFF terminology integration
 
 This guide is product-neutral. Veterinary, human-health, emergency and other
-portals can use the same server-side client. Keep the service token in the BFF;
-never import this package from a Client Component.
+portals can use the same server-side client. Keep every backend credential in
+the BFF; never import this package from a Client Component.
 
 ## The four concepts
 
@@ -24,7 +24,7 @@ portal does not need to understand or repeat it.
 ## Install and configure once
 
 ```bash
-npm install --save-exact terminology-sdk-node-ts@0.3.0
+npm install --save-exact terminology-sdk-node-ts@0.3.1
 ```
 
 ### Authentication used by the current release
@@ -33,35 +33,35 @@ There are two separate authentication boundaries:
 
 1. The portal authenticates the person to its own BFF. The BFF must validate
    that session, ID token and applicable capability before serving a route.
-2. The BFF authenticates itself to the terminology service with the opaque
-   bearer credential described below. This is not the end-user ID token.
+2. The BFF authenticates itself to the terminology service with a short-lived
+   backend OIDC access token. This is not the end-user ID token.
 
-The service operator provisions the BFF credential for the subscribed
-integration and environment. Deliver it through an approved secure channel,
-then store it in the deployment platform's secret manager as
-`TERMINOLOGY_SERVICE_TOKEN`. Store the service URL as
-`TERMINOLOGY_BASE_URL`. Do not put either value in source control, a
-`NEXT_PUBLIC_*` variable, browser storage, logs or an email.
+The service operator supplies the exact terminology audience and allowlists the
+backend `client_id` for the subscribed integration. The identity provider owns
+the signing key and publishes its public key through HTTPS JWKS. The BFF keeps
+the issuer wallet or client credential in its deployment secret manager and
+obtains a fresh access token with a maximum lifetime of five minutes.
 
-`TerminologyClient` adds `Authorization: Bearer <service token>` to managed
-service requests. The SDK does not mint or sign credentials. A BFF must not
-forward its service token to React or reuse a browser-supplied token as the
-managed-service credential.
+Pass that operation to `accessTokenProvider`. `TerminologyClient` invokes it
+only for an uncached service request and adds
+`Authorization: Bearer <backend access token>`. The terminology SDK does not
+mint or sign credentials. A BFF must not forward the backend token to React or
+reuse a browser-supplied token as the managed-service credential.
 
-For a Firebase App Hosting deployment, configure both values as backend
-secrets and bind them only to the BFF runtime. For another hosting platform,
-use its equivalent server-side secret store.
+For a Firebase App Hosting deployment, bind the issuer wallet or client
+credential only to the BFF runtime. For another hosting platform, use its
+equivalent server-side secret store.
 
-The integrator therefore needs these two values from the service operator:
+The integrator needs these non-secret values from the service operator:
 
 ```dotenv
 TERMINOLOGY_BASE_URL=https://terminology.example
-TERMINOLOGY_SERVICE_TOKEN=<provisioned-separately>
+TERMINOLOGY_OIDC_AUDIENCE=https://terminology.example
+TERMINOLOGY_OIDC_CLIENT_ID=<allowlisted-backend-client-id>
 ```
 
-Do not send the real token in a ticket or integration email. The email should
-identify the secret name and the secure delivery channel or secret-manager
-grant used to obtain it.
+The issuer wallet seed, private key or client secret stays in the secret
+manager. Do not send it or a generated access token in a ticket or email.
 
 ### OIDC service credentials
 
@@ -71,12 +71,13 @@ client identity. The allowlist is a list of backend clients or service
 principals, not portal URLs. The issuer must expose usable discovery metadata
 and JWKS, or the service must receive an explicitly governed JWKS URL.
 
-If the managed service enables that mode later, a separate infrastructure or
-authentication provider obtains the service access token. The terminology SDK
-remains product-neutral and only sends the supplied token; it does not contain
-issuer-specific signing keys or token-creation utilities. Until the operator
-explicitly supplies an OIDC audience and client credential, use the opaque
-service token above.
+The authentication provider obtains or signs the service access token. The
+terminology SDK remains product-neutral and only sends the supplied token; it
+does not contain issuer-specific signing keys or token-creation utilities.
+
+`TERMINOLOGY_SERVICE_TOKEN` remains available as a static compatibility
+credential for an existing deployment. Store it only in the BFF secret manager
+and pass it as `serviceToken`; do not configure both authentication modes.
 
 Create a server-only module. A module singleton reuses the cache across route
 calls in the same BFF process.
@@ -90,17 +91,33 @@ import {
 } from 'terminology-sdk-node-ts/terminology-client';
 
 const baseUrl = process.env.TERMINOLOGY_BASE_URL;
-const serviceToken = process.env.TERMINOLOGY_SERVICE_TOKEN;
-if (!baseUrl || !serviceToken) throw new Error('terminology_configuration_required');
+if (!baseUrl) throw new Error('terminology_configuration_required');
+
+async function createBackendAccessToken(): Promise<string> {
+  // Call the hosting platform's OIDC client or the BFF's governed server-wallet
+  // adapter here. Sign for the audience and client_id supplied by the service.
+  // Never use the current person's browser ID token.
+  return backendIdentity.getAccessToken({
+    audience: process.env.TERMINOLOGY_OIDC_AUDIENCE!,
+    clientId: process.env.TERMINOLOGY_OIDC_CLIENT_ID!,
+    maxLifetimeSeconds: 300,
+  });
+}
 
 export const terminology = new TerminologyClient({
   baseUrl,
-  serviceToken,
+  accessTokenProvider: createBackendAccessToken,
   cache: new MemoryTerminologyCache({ maxEntries: 2_000 }),
   candidateTtlMs: 5 * 60_000,       // text search changes frequently
   stableTtlMs: 24 * 60 * 60_000,    // ValueSets and exact labels are stable
 });
 ```
+
+The access token must be a signed `at+jwt` whose `iss` and `aud` exactly match
+the service configuration, whose `client_id` and `azp` both equal the
+allowlisted backend client, and whose `iat`/`exp` lifetime is at most five
+minutes. The identity provider publishes the matching public key at the
+configured `jwksUri`.
 
 `MemoryTerminologyCache` is bounded and process-local. In a multi-replica BFF,
 implement the small asynchronous `TerminologyCache` interface with Redis or the
