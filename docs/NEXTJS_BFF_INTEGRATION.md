@@ -159,6 +159,127 @@ The BFF, not the browser, derives `sector` and jurisdiction from trusted tenant,
 wallet or session context. A changed URL or browser-selected role must not grant
 access to another sector.
 
+## Reusable React code search component
+
+The browser calls only the authenticated BFF route above. This component can be
+used unchanged in a create/edit form or in a Research query builder.
+
+```tsx
+// src/components/TerminologyCodeSearch.tsx
+'use client';
+
+import { useState, type FormEvent } from 'react';
+
+export type TerminologyCandidate = Readonly<{
+  system: string;
+  code: string;
+  text: string;       // label in the requested language
+  display: string;    // canonical English label
+  language: string;
+}>;
+
+type Props = Readonly<{
+  param: string;      // for example Condition.code or Observation.code
+  language: string;
+  systems?: readonly string[];
+  onSelect(candidate: TerminologyCandidate): void;
+}>;
+
+export function TerminologyCodeSearch({
+  param,
+  language,
+  systems = [],
+  onSelect,
+}: Props) {
+  const [text, setText] = useState('');
+  const [candidates, setCandidates] = useState<readonly TerminologyCandidate[]>([]);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState('');
+
+  async function search(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPending(true);
+    setError('');
+    try {
+      const query = new URLSearchParams({ text, param, language });
+      systems.forEach((system) => query.append('system', system));
+      const response = await fetch(`/api/terminology/candidates?${query}`, {
+        credentials: 'same-origin',
+      });
+      const body = await response.json() as {
+        candidates?: readonly TerminologyCandidate[];
+        error?: string;
+      };
+      if (!response.ok) throw new Error(body.error || 'terminology_search_failed');
+      setCandidates(body.candidates ?? []);
+    } catch (cause) {
+      setCandidates([]);
+      setError(cause instanceof Error ? cause.message : 'terminology_search_failed');
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <section>
+      <form onSubmit={search}>
+        <label>
+          Clinical concept
+          <input
+            value={text}
+            onChange={(event) => setText(event.target.value)}
+            minLength={2}
+            maxLength={160}
+            required
+          />
+        </label>
+        <button type="submit" disabled={pending}>
+          {pending ? 'Searching…' : 'Search'}
+        </button>
+      </form>
+
+      {error && <p role="alert">{error}</p>}
+      {candidates.length > 0 && (
+        <fieldset>
+          <legend>Select the intended code</legend>
+          {candidates.map((candidate) => (
+            <label key={`${candidate.system}|${candidate.code}`}>
+              <input
+                type="radio"
+                name={`${param}-candidate`}
+                value={`${candidate.system}|${candidate.code}`}
+                onChange={() => onSelect(candidate)}
+              />
+              {candidate.text}
+              {candidate.display !== candidate.text && ` — ${candidate.display}`}
+              {` (${candidate.code})`}
+            </label>
+          ))}
+        </fieldset>
+      )}
+    </section>
+  );
+}
+```
+
+For a clinical create/edit form, store the selected coding rather than the
+typed phrase:
+
+```tsx
+<TerminologyCodeSearch
+  param="Condition.code"
+  language={resourceLanguage}
+  onSelect={(candidate) => setConditionCoding({
+    system: candidate.system,
+    code: candidate.code,
+    display: candidate.display,
+  })}
+/>
+```
+
+The visible `text` remains localized UI text. The selected `system|code` is the
+clinical identity; do not persist every returned candidate.
+
 ## Populate a dropdown from the governed ValueSet
 
 ```ts
@@ -208,6 +329,46 @@ if (labels) {
 Persist the selected `system` and `code`. Localized `text` is presentation and
 English `display` is a stable cross-language research label; neither replaces
 the coded identity.
+
+## Use the same component in Research
+
+Use `TerminologyCodeSearch` in the Research query builder as well. The user
+types a phrase, presses Search, reviews the same candidate list and explicitly
+selects one code. The selected pair becomes one exact FHIR search filter:
+
+```tsx
+const [researchCode, setResearchCode] = useState<{
+  system: string;
+  code: string;
+} | null>(null);
+
+<TerminologyCodeSearch
+  param="Condition.code"
+  language={userLanguage}
+  onSelect={(candidate) => setResearchCode({
+    system: candidate.system,
+    code: candidate.code,
+  })}
+/>
+
+// Submit through the portal's authenticated Research BFF route.
+const researchFilter = researchCode && {
+  param: 'Condition.code',
+  system: researchCode.system,
+  code: researchCode.code,
+};
+```
+
+The Research BFF applies this as an exact `system|code` filter using its
+existing FHIR SearchParameter/flat-claim search implementation. It must not
+trust a browser-supplied sector, role or permission, and it must not turn every
+candidate into an implicit OR query.
+
+If the Research screen intentionally offers **free-text discovery** instead of
+an exact code filter, it does not need candidate expansion. Search the indexed
+English `code-display` plus the `code-text` for the resource's language. The UI
+may then offer the code picker above to refine the text result into an exact
+filter.
 
 ## Research indexing and searching
 
