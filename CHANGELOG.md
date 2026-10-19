@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Accept canonical `org.schema.<Type>.<property>` claims in the high-level BFF
+  client so non-FHIR qualification editors can search and resolve labels while
+  preserving the same terminology identity.
+
 ## 0.3.1 - 2026-10-15
 
 - Add an asynchronous `accessTokenProvider` for short-lived backend OIDC

@@ -15,7 +15,7 @@ export type CodeCandidate = Readonly<{
 }>;
 
 export type TerminologyParameterContext = Readonly<{
-  /** Canonical resource-qualified FHIR SearchParameter name, for example Condition.code. */
+  /** Canonical resource-qualified claim, for example Condition.code or org.schema.EducationalOccupationalCredential.credentialCategory. */
   param?: string;
   /** Compatible alias used by flat-claim integrations. Prefer param in new BFF code. */
   claim?: string;
@@ -280,7 +280,9 @@ function normalizedContext(input: TerminologyParameterContext): NormalizedContex
   }
   const sector = input.sector.trim();
   const jurisdiction = clean(input.jurisdiction).toUpperCase();
-  if (!/^[A-Z][A-Za-z0-9]*\.[A-Za-z][A-Za-z0-9.-]*$/.test(param) || !sector) {
+  const canonicalClaim = /^[A-Z][A-Za-z0-9]*\.[A-Za-z][A-Za-z0-9.-]*$/.test(param)
+    || /^org\.schema\.[A-Z][A-Za-z0-9]*(?:\.[A-Za-z][A-Za-z0-9-]*)+$/.test(param)
+  if (!canonicalClaim || !sector) {
     throw new Error('terminology_parameter_context_invalid');
   }
   return { param, sector, jurisdiction, language: validLanguage(input.language ?? 'en') };
