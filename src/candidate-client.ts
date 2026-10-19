@@ -85,10 +85,12 @@ export class TerminologyCandidateClient {
     });
     const body = await response.json().catch(() => undefined) as {
       data?: CandidateResource[];
+      meta?: Readonly<{ terminologyVersions?: unknown }>;
       errors?: Array<{ detail?: unknown }>;
     } | undefined;
     if (!response.ok) throw new Error(clean(body?.errors?.[0]?.detail) || `terminology_candidates_http_${response.status}`);
-    return (body?.data || []).flatMap((resource) => mapResource(resource, input.language));
+    const terminologyVersions = stringRecord(body?.meta?.terminologyVersions);
+    return (body?.data || []).flatMap((resource) => mapResource(resource, input.language, terminologyVersions));
   }
 
   async #resolveAccessToken(): Promise<string | undefined> {
@@ -100,12 +102,18 @@ export class TerminologyCandidateClient {
   }
 }
 
-function mapResource(resource: CandidateResource, requestedLanguage: string): ClinicalTerminologyCandidate[] {
+function mapResource(
+  resource: CandidateResource,
+  requestedLanguage: string,
+  terminologyVersions: Readonly<Record<string, string>>,
+): ClinicalTerminologyCandidate[] {
   const system = clean(resource.id);
   if (!system) return [];
   const sources = Array.isArray(resource.meta?.sources) ? resource.meta.sources.map(clean).filter(Boolean) : [];
   const source = sources[0] || system;
-  const terminologyVersion = clean(resource.meta?.versionId) || clean(resource.meta?.terminologyVersion);
+  const terminologyVersion = clean(resource.meta?.versionId)
+    || clean(resource.meta?.terminologyVersion)
+    || clean(terminologyVersions[system]);
   return Object.entries(resource.attributes || {}).flatMap(([code, rawValue]) => {
     const value = clean(rawValue);
     if (!code.trim() || !value) return [];
@@ -129,4 +137,12 @@ function validLanguage(value: string): string {
 
 function clean(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function stringRecord(value: unknown): Readonly<Record<string, string>> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value).flatMap(([key, item]) => {
+    const text = clean(item);
+    return text ? [[key, text]] : [];
+  }));
 }

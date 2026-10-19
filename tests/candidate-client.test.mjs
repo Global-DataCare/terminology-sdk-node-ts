@@ -35,6 +35,27 @@ test('maps grouped JSON:API resources to canonical clinical candidates', async (
   }]);
 });
 
+test('maps the grouped document terminology version when the resource omits it', async () => {
+  const system = 'urn:antifraud:terminology:synthetic:education-qualification';
+  const client = new TerminologyCandidateClient({
+    baseUrl: 'https://terminology.example', serviceToken: 'private-service-token',
+    fetchImplementation: async () => Response.json({
+      data: [{
+        id: system,
+        attributes: { 'synthetic-bachelor-001': 'Bachelor-level synthetic qualification' },
+        meta: { sources: ['SYNTHETIC_EDUCATION_DEMO'] },
+      }],
+      meta: { terminologyVersions: { [system]: 'demo-2026-10' } },
+    }),
+  });
+
+  assert.equal((await client.search({
+    text: 'synthetic qualification', language: 'en', fhirVersion: 'R4',
+    sector: 'antifraud-tech', jurisdiction: 'ES',
+    claim: 'org.schema.EducationalOccupationalCredential.credentialCategory',
+  }))[0].terminologyVersion, 'demo-2026-10');
+});
+
 test('rejects unsafe or unbounded requests before contacting the service', async () => {
   let calls = 0;
   const client = new TerminologyCandidateClient({

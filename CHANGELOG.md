@@ -5,6 +5,8 @@
 - Accept canonical `org.schema.<Type>.<property>` claims in the high-level BFF
   client so non-FHIR qualification editors can search and resolve labels while
   preserving the same terminology identity.
+- Preserve a system's pinned version from the grouped JSON:API document metadata
+  when the individual terminology resource omits a duplicate version field.
 
 ## 0.3.1 - 2026-10-15
 
