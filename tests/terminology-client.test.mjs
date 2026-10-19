@@ -63,6 +63,28 @@ test('accepts claim as a compatible alias for param and keeps source optional', 
   assert.deepEqual(request.searchParams.getAll('source'), ['SNOMED-GPS']);
 });
 
+test('passes a canonical Schema.org qualification claim through the BFF client', async () => {
+  let request;
+  const client = new TerminologyClient({
+    baseUrl: 'https://terminology.example', serviceToken: 'secret',
+    fetchImplementation: async (url) => {
+      request = new URL(url);
+      return Response.json({ data: [] });
+    },
+  });
+
+  await client.searchCodeCandidatesFromText({
+    text: 'bachelor',
+    claim: 'org.schema.EducationalOccupationalCredential.credentialCategory',
+    language: 'en', sector: 'antifraud-tech', jurisdiction: 'ES',
+  });
+
+  assert.equal(
+    request.searchParams.get('claim'),
+    'org.schema.EducationalOccupationalCredential.credentialCategory',
+  );
+});
+
 test('returns every localized ValueSet option as system, code, text and English display', async () => {
   const requests = [];
   const client = new TerminologyClient({
