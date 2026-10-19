@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.3.2 - 2026-10-19
+
 - Accept canonical `org.schema.<Type>.<property>` claims in the high-level BFF
   client so non-FHIR qualification editors can search and resolve labels while
   preserving the same terminology identity.

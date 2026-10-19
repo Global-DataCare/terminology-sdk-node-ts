@@ -1,6 +1,6 @@
 {
   "name": "terminology-sdk-node-ts",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Node.js download, verification and local cache adapters for terminology snapshots",
   "author": "Connecting Solution & Applications Ltd. (ConnectHealth.info)",
   "license": "Apache-2.0",
