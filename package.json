@@ -48,7 +48,7 @@
     "prepack": "npm run check"
   },
   "dependencies": {
-    "sos-data-utils-ts": "0.5.1",
+    "sos-data-utils-ts": "0.7.0",
     "terminology-data-utils-ts": "0.2.0",
     "terminology-sdk-core-ts": "0.2.0"
   },

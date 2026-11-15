@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Pin the independent published SOS Data contract and remove the nested GDC
+  dependency from the registry lock and installed production graph. Preserve
+  candidate wire fields and existing terminology data/core pins; add registry
+  independence and public typed-consumer checks.
+
+## Unreleased
+
 ## 0.3.2 - 2026-10-19
 
 - Accept canonical `org.schema.<Type>.<property>` claims in the high-level BFF
