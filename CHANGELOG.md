@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.1 - 2026-11-16
 
 - Consume the published Terminology Data 0.2.2 and Core 0.2.1 contracts to retain
   per-label designation provenance through verified downloads, atomic cache
