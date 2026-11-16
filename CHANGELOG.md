@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Consume the published Terminology Data 0.2.2 and Core 0.2.1 contracts to retain
+  per-label designation provenance through verified downloads, atomic cache
+  activation, offline reload and local search. Preserve metadata-free snapshots
+  and reject corrupt updates without replacing the prior cached snapshot.
+
 ## 0.4.0 - 2026-11-15
 
 - Pin the independent published SOS Data contract and remove the nested GDC

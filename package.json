@@ -49,8 +49,8 @@
   },
   "dependencies": {
     "sos-data-utils-ts": "0.7.0",
-    "terminology-data-utils-ts": "0.2.0",
-    "terminology-sdk-core-ts": "0.2.0"
+    "terminology-data-utils-ts": "0.2.2",
+    "terminology-sdk-core-ts": "0.2.1"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

@@ -10,6 +10,12 @@ The runtime exposes complete grouped entries through `entries(snapshotId,
 { claim, language, text })`. It never expands the downloaded `code -> value`
 maps into a different wire format.
 
+Snapshots can carry optional per-label designation evidence. Download, cache
+activation and offline reload preserve that evidence in grouped entries;
+search matches pair each value with its own label source and edition through
+`labelProvenance`. The catalog membership version stays separate. Snapshots
+without designation metadata keep their existing result shape.
+
 Contracts come from
 [`terminology-data-utils-ts`](https://github.com/Global-DataCare/terminology-data-utils-ts)
 and local search from
